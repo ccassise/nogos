@@ -4,7 +4,7 @@
 
 #include "message_queue.h"
 
-void test_msgq_create(void) {
+static void test_msgq_create(void) {
 	MessageQueue *msgq = msgq_create();
 
 	ASSERT(msgq != NULL);
@@ -12,7 +12,7 @@ void test_msgq_create(void) {
 	msgq_destroy(msgq);
 }
 
-void test_msgq_get_set(void) {
+static void test_msgq_get_set(void) {
 	MessageQueue *msgq = msgq_create();
 
 	Message msg1 = { .to = { 0, 1, 2 }, .data = "hello, ", .to_count = 3, .data_count = 8 };
@@ -51,7 +51,7 @@ void test_msgq_get_set(void) {
 	msgq_destroy(msgq);
 }
 
-void test_msgq_empty(void) {
+static void test_msgq_empty(void) {
 	MessageQueue *msgq = msgq_create();
 
 	const int num_loops = 512;
@@ -76,7 +76,7 @@ void test_msgq_empty(void) {
 	msgq_destroy(msgq);
 }
 
-void test_msgq_one_at_a_time(void) {
+static void test_msgq_one_at_a_time(void) {
 	MessageQueue *msgq = msgq_create();
 
 	const int num_loops = 512;
@@ -94,7 +94,7 @@ void test_msgq_one_at_a_time(void) {
 	msgq_destroy(msgq);
 }
 
-void test_msgq_put_two_get_one(void) {
+static void test_msgq_put_two_get_one(void) {
 	MessageQueue *msgq = msgq_create();
 
 	int set_num = 0;

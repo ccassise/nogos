@@ -19,7 +19,7 @@
 
 #define BACKLOG 10
 
-void *get_in_addr(struct sockaddr* sa) {
+static void *get_in_addr(struct sockaddr* sa) {
 	if (sa->sa_family == AF_INET) {
 		return &(((struct sockaddr_in*)sa)->sin_addr);
 	}
@@ -27,7 +27,7 @@ void *get_in_addr(struct sockaddr* sa) {
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-void add_to_pfds(struct pollfd *pfds[], int newfd, size_t *fd_count, size_t *fd_size) {
+static void add_to_pfds(struct pollfd *pfds[], int newfd, size_t *fd_count, size_t *fd_size) {
 	if (*fd_count == *fd_size) {
 		*fd_size *= 2;
 
@@ -41,7 +41,7 @@ void add_to_pfds(struct pollfd *pfds[], int newfd, size_t *fd_count, size_t *fd_
 	(*fd_count)++;
 }
 
-void del_from_pfds(struct pollfd pfds[], size_t i, size_t *fd_count) {
+static void del_from_pfds(struct pollfd pfds[], size_t i, size_t *fd_count) {
 	pfds[i] = pfds[*fd_count - 1];
 
 	(*fd_count)--;
@@ -52,14 +52,15 @@ typedef struct {
 	MessageQueue *msgq;
 } Context;
 
-void serve(Context *ctx, Protocol *pro, int fd) {
+static void serve(Context *ctx, Protocol *pro, int fd) {
 	int status;
 	switch (pro->type) {
 	case PRO_JOIN:
 		status = lobby_join(ctx->l, fd);
 		break;
 	case PRO_LEAVE:
-		status = lobby_leave(ctx->l, fd);
+		status = 0;
+		lobby_leave(ctx->l, fd);
 		break;
 	case PRO_MOVE:
 		status = lobby_play_move(ctx->l, fd, pro->arg1, pro->arg2);
@@ -133,7 +134,7 @@ int main(int argc, char **argv) {
 	add_to_pfds(&pfds, listener, &fd_count, &fd_size);
 
 	MessageQueue *msgq = msgq_create();
-	Context ctx = { .l = lobby_create(msgq), .msgq = msgq };
+	Context ctx = { .l = lobby_create(msgq, 9, 9), .msgq = msgq };
 	if (!msgq) {
 		fprintf(stderr, "failed to allocate memory for MessageQueue\n");
 		exit(1);

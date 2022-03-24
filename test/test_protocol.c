@@ -3,21 +3,19 @@
 #include "protocol.h"
 #include "task.h"
 
-FILE *stream_setup(const char *input) {
-	#define COPIED_SIZE 512
-	char copied[COPIED_SIZE];
+static FILE *stream_setup(const char *input) {
+	// This code weirdly causes issues with -fsanitize=address. Passing strlen +
+	// 1 fixes it but then there's a terminating null in the input, which I
+	// really do not want. Valgrind reports nothing wrong.
+	FILE *stream = fmemopen(NULL, strlen(input), "r+");
 
-	strncpy(copied, input, COPIED_SIZE - 1);
-	copied[COPIED_SIZE - 1] = '\0';
+	fwrite(input, sizeof *input, strlen(input), stream);
+	rewind(stream);
 
-	FILE *stream = fmemopen(copied, strlen(input), "r");
-
-
-	#undef COPIED_SIZE
 	return stream;
 }
 
-void test_pro_parse_fail(void) {
+static void test_pro_parse_fail(void) {
 	const char *inputs[] = {
 		"     ",
 		"\n\n\n\t\t\t\r\n",
@@ -39,7 +37,7 @@ void test_pro_parse_fail(void) {
 
 }
 
-void test_pro_parse_join(void) {
+static void test_pro_parse_join(void) {
 	const char *inputs[] = {
 		"JOIN\r\n",
 		"   \t\t  JOIN\t\t\r\n",
@@ -60,7 +58,7 @@ void test_pro_parse_join(void) {
 	}
 }
 
-void test_pro_parse_join_fail(void) {
+static void test_pro_parse_join_fail(void) {
 	const char *inputs[] = {
 		"JOIN oh no\r\n",
 		"h JOIN\r\n",
@@ -80,7 +78,7 @@ void test_pro_parse_join_fail(void) {
 	}
 }
 
-void test_pro_parse_leave(void) {
+static void test_pro_parse_leave(void) {
 	const char *inputs[] = {
 		"LEAVE\r\n",
 		"   \t\t  LEAVE\t\t\r\n",
@@ -101,7 +99,7 @@ void test_pro_parse_leave(void) {
 	}
 }
 
-void test_pro_parse_leave_fail(void) {
+static void test_pro_parse_leave_fail(void) {
 	const char *inputs[] = {
 		"LEAVE oh no\r\n",
 		"h LEAVE\r\n",
@@ -121,8 +119,7 @@ void test_pro_parse_leave_fail(void) {
 	}
 }
 
-
-void test_pro_parse_move(void) {
+static void test_pro_parse_move(void) {
 	const char *inputs[] = {
 		"MOVE 1 23\r\n",
 		"MOVE 1 1",
@@ -152,7 +149,7 @@ void test_pro_parse_move(void) {
 	}
 }
 
-void test_pro_parse_move_fail(void) {
+static void test_pro_parse_move_fail(void) {
 	const char *inputs[] = {
 		"MOVE\r\n",
 		"  MOVE  abc  ",
