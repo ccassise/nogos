@@ -20,7 +20,10 @@ foreach(test IN LISTS tests)
 		target_compile_options(test_${test} PRIVATE ${wflags})
 	else()
 		target_compile_options(test_${test} PRIVATE ${wflags} ${sanitizers})
-		target_link_options(test_${test} PRIVATE ${sanitizers} -static-libasan)
+		# GCC
+		# target_link_options(test_${test} PRIVATE ${sanitizers} -static-libasan)
+		# Clang
+		target_link_options(test_${test} PRIVATE ${sanitizers} -static-libsan)
 	endif()
 
 
