@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 
-#define DEBUG(fmt, ...) fprintf(stderr, "[DEBUG] " fmt, ## __VA_ARGS__)
+#define DEBUG(fmt) fprintf(stderr, "[DEBUG] " fmt)
+#define DEBUGF(fmt, ...) fprintf(stderr, "[DEBUG] " fmt, __VA_ARGS__)
 
 #endif

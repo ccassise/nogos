@@ -13,7 +13,7 @@
  * @return true The next characters in stream match exactly those given in string.
  * @return false The next characters in stream do not match those given in string.
  */
-bool match(FILE *stream, const char *str) {
+static bool match(FILE *stream, const char *str) {
 	int c;
 	while ((c = getc(stream)) != EOF && *str && *str == c) {
 		str++;
@@ -29,7 +29,7 @@ bool match(FILE *stream, const char *str) {
  * @return int The last read space. If there were no spaces then no characters
  * were consumed.
  */
-int skipspace(FILE *stream) {
+static int skipspace(FILE *stream) {
 	int c;
 	while ((c = getc(stream)) != EOF) {
 		if (!isspace(c)) {

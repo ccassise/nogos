@@ -136,20 +136,20 @@ int lobby_join(Lobby *l, int playerfd) {
 	// Don't let the same player join twice.
 	for (int i = 0; i < l->players_count; i++) {
 		if (l->players[i].fd == playerfd) {
-			DEBUG("[%d] already in lobby\n", playerfd);
+			DEBUGF("[%d] already in lobby\n", playerfd);
 			return -1;
 		}
 	}
 
 	if (lobby_full(l)) {
-		DEBUG("[%d] lobby full\n", playerfd);
+		DEBUGF("[%d] lobby full\n", playerfd);
 		return -1;
 	}
 
 	Player p;
 	p.fd = playerfd;
 
-	DEBUG("[%d] joined a lobby\n", playerfd);
+	DEBUGF("[%d] joined a lobby\n", playerfd);
 
 	l->players[l->players_count] = p;
 	l->players_count++;
@@ -168,7 +168,7 @@ void lobby_leave(Lobby *l, int playerfd) {
 	}
 
 	if (player_index != -1) {
-		DEBUG("[%d] left lobby\n", playerfd);
+		DEBUGF("[%d] left lobby\n", playerfd);
 		l->players[player_index] = l->players[l->players_count - 1];
 		l->players_count--;
 		update_player_team(l);
@@ -325,7 +325,7 @@ int lobby_play_move(Lobby *l, int playerfd, const char *row_str, const char *col
 	if((loser = find_loser(l)) != '\0') {
 		l->state->game_over = true;
 		char winner = loser == 'O' ? 'X' : 'O';
-		DEBUG("%c wins\n", winner);
+		DEBUGF("%c wins\n", winner);
 
 		buf_size = snprintf(buf, 128, "WINS %c\r\n", winner);
 		broadcast_all(l, buf, (size_t)buf_size);

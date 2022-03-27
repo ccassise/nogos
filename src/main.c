@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
 						del_from_pfds(pfds, i, &fd_count);
 					} else {
 						Protocol pro = pro_parse(fmemopen(buf, (size_t)buf_count, "r"));
-						DEBUG("[%d] parse: %d '%s' '%s'\n", sender_fd, pro.type, pro.arg1, pro.arg2);
+						DEBUGF("[%d] parse: %d '%s' '%s'\n", sender_fd, pro.type, pro.arg1, pro.arg2);
 						serve(&ctx, &pro, sender_fd);
 					}
 				}
