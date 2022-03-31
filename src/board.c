@@ -3,6 +3,17 @@
 
 #include "board.h"
 
+/**
+ * @brief Gets the 1D index from a position.
+ * 
+ * @param b The board instance.
+ * @param pos The position to convert.
+ * @return size_t The array index of the given position.
+ */
+static size_t pos_index(size_t cols, BoardPos pos) {
+	return pos.row * cols + pos.col; 
+}
+
 Board *board_create(size_t rows, size_t cols) {
 	Board *b = malloc(sizeof *b);
 	b->rows = rows;
@@ -13,20 +24,9 @@ Board *board_create(size_t rows, size_t cols) {
 	return b;
 }
 
-void board_destroy(Board *b) {
+void board_free(Board *b) {
 	free(b->board);
 	free(b);
-}
-
-/**
- * @brief Gets the 1D index from a position.
- * 
- * @param b The board instance.
- * @param pos The position to convert.
- * @return size_t The array index of the given position.
- */
-static size_t pos_index(size_t cols, BoardPos pos) {
-	return pos.row * cols + pos.col; 
 }
 
 char board_get(Board *b, BoardPos pos) {

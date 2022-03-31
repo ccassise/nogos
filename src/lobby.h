@@ -1,15 +1,9 @@
 #ifndef LOBBY_H_
 #define LOBBY_H_
 
-#include "board.h"
-#include "message_queue.h"
+#include "player.h"
 
 #define LOBBY_MAX_PLAYERS 2
-
-typedef struct {
-	int fd; // Player's file descriptor.
-	char team;
-} Player;
 
 /**
  * @brief Implements a lobby where a single game of Atari Go can be played. The
@@ -18,31 +12,31 @@ typedef struct {
  * pieces from the same player have no more adjacent spaces to grow in to.
  * 
  */
-typedef struct {
-	int players_count; // Current number of players in the lobby.
+typedef struct Lobby {
 	Player players[LOBBY_MAX_PLAYERS]; // List of all players.
-	struct State *state; // Keeps track of the game state.
+	int players_len; // Current number of players in the lobby.
 
-	Board *board; // The board that the game will be played on.
-	MessageQueue *msgq; // Used to be able to send messages between players.
+	struct Board *board; // The board that the game will be played on.
+
+	struct State *state; // Keeps track of the game state.
 } Lobby;
 
 /**
- * @brief Create and initializes lobby struct. The passed in MessageQueue should
+ * @brief Create and initializes lobby struct. The passed in Queue should
  * outlive the lobby.
  * 
  * @param rows The number of rows the game board should have.
  * @param cols The number of cols the game board should have.
  * @return Lobby The intialized lobby struct.
  */
-Lobby *lobby_create(MessageQueue *msgq, size_t rows, size_t cols);
+Lobby *lobby_create(size_t rows, size_t cols);
 
 /**
  * @brief Free the space allocated by create.
  * 
  * @param l The Lobby instance to free.
  */
-void lobby_destroy(Lobby *l);
+void lobby_free(Lobby *l);
 
 /**
  * @brief Inserts a player into the lobby.
@@ -51,15 +45,15 @@ void lobby_destroy(Lobby *l);
  * @param playerfd The file descriptor of the player.
  * @return int -1 if the player is unable to join the lobby. 0 if joining the lobby was successful.
  */
-int lobby_join(Lobby *l, int playerfd);
+int lobby_join(Lobby *l, const Player *player);
 
 /**
  * @brief Removes a player from the lobby.
  * 
  * @param l The lobby instance to leave.
- * @param playerfd The file descriptor of the player.
+ * @param player The player leaving.
  */
-void lobby_leave(Lobby *l, int playerfd);
+void lobby_leave(Lobby *l, const Player *player);
 
 /**
  * @brief Places a piece of the given player at the given coordinates. Advances
@@ -71,6 +65,14 @@ void lobby_leave(Lobby *l, int playerfd);
  * @param row_str String representation of an integer that will be which col to place the piece.
  * @return int -1 if the move was unable to be played. 0 if the move was played successfully.
  */
-int lobby_play_move(Lobby *l, int playerfd, const char *row_str, const char *col_str);
+int lobby_play_move(Lobby *l, const Player *player, const char *row_str, const char *col_str);
+
+/**
+ * @brief Returns the team that won the game. Returns -1 if the game is still in progress.
+ * 
+ * @param l The lobby instance to get the winner from.
+ * @return int -1 if the game is still in progress, otherwise returns the char team that won.
+ */
+int lobby_winner(Lobby *l);
 
 #endif

@@ -10,7 +10,7 @@ set_property(TARGET nogos PROPERTY C_STANDARD 99)
 
 target_compile_options(nogos PRIVATE ${wflags} ${sanitizers})
 # GCC
-# target_link_options(nogos PRIVATE ${sanitizers} -static-libasan)
+target_link_options(nogos PRIVATE ${sanitizers} -static-libasan)
 
 # Clang
-target_link_options(nogos PRIVATE ${sanitizers} -static-libsan)
+# target_link_options(nogos PRIVATE ${sanitizers} -static-libsan)

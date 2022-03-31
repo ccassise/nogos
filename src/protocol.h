@@ -9,16 +9,18 @@
 
 typedef enum {
 	PRO_ERROR,
+	PRO_LOGIN,
+	PRO_LOGOUT,
 	PRO_JOIN,
 	PRO_LEAVE,
 	PRO_MOVE,
 } ProtocolMessage;
 
-typedef struct {
-	ProtocolMessage type;
-
+typedef struct Protocol {
 	char arg1[PRO_ARG_SIZE];
 	char arg2[PRO_ARG_SIZE];
+
+	ProtocolMessage type;
 } Protocol;
 
 /**
