@@ -234,7 +234,7 @@ int main(int argc, char **argv) {
 	int status;
 	struct addrinfo *servinfo;
 	if ((status = getaddrinfo(NULL, argv[1], &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+		LOG_ERROR("getaddrinfo error: %s\n", gai_strerror(status));
 		exit(71);
 	}
 
@@ -279,12 +279,12 @@ int main(int argc, char **argv) {
 	}
 
 	if (!msgq || !closeq || !ctx || !ctx->l) {
-		fprintf(stderr, "failed to instantiate structs\n");
+		LOG_ERROR("failed to instantiate structs\n");
 		exit(71);
 	}
 
 	if (ctx_add_player(ctx, &(Player){ .fd = listener, .name = "HOST" }) < 0) {
-		fprintf(stderr, "failed to add listener\n");
+		LOG_ERROR("failed to add listener\n");
 		exit(70);
 	}
 

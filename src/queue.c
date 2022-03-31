@@ -26,7 +26,8 @@ static int resize(Queue *q) {
 	if (q->len == q->size) {
 		const size_t head_offset = (size_t)(q->head - q->buffer);
 		const size_t tail_offset = (size_t)(q->tail - q->buffer);
-		const size_t old_size = q->size * q->elem_size;
+		const size_t end_offset = (size_t)(q->end - q->buffer);
+		const size_t tail_size = end_offset - tail_offset;
 
 		q->buffer = realloc(q->buffer, q->elem_size * q->size * 2);
 		if (!q->buffer) {
@@ -36,19 +37,18 @@ static int resize(Queue *q) {
 		q->size = q->size * 2;
 		q->end = q->buffer + (q->size * q->elem_size);
 
-		if (head_offset == old_size) {
+		if (head_offset == end_offset) {
 			// Nothing needs to be moved.
 			q->head = q->buffer + head_offset;
 			q->tail = q->buffer + tail_offset;
-		} else if (head_offset < old_size - tail_offset) {
+		} else if (head_offset < tail_size) {
 			// Move head section to the end of tail section.
-			memmove(q->buffer + old_size, q->buffer, head_offset);
-			q->head = q->buffer + old_size + head_offset;
+			memmove(q->buffer + end_offset, q->buffer, head_offset);
+			q->head = q->buffer + end_offset + head_offset;
 			q->tail = q->buffer + tail_offset;
 		} else {
 			// Move tail section to end of newly allocated buffer.
-			size_t tail_size = old_size - tail_offset;
-			q->tail = memmove(q->buffer + old_size + tail_offset, q->buffer + tail_offset, tail_size);
+			q->tail = memmove(q->buffer + end_offset + tail_offset, q->buffer + tail_offset, tail_size);
 			q->head = q->buffer + head_offset;
 		}
 	}
