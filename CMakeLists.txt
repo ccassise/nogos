@@ -40,9 +40,11 @@ list(APPEND sanitizers
 
 list(APPEND srcfiles
 	${PROJECT_SOURCE_DIR}/src/board.c
+	${PROJECT_SOURCE_DIR}/src/context.c
 	${PROJECT_SOURCE_DIR}/src/lobby.c
-	${PROJECT_SOURCE_DIR}/src/message_queue.c
+	${PROJECT_SOURCE_DIR}/src/player.c
 	${PROJECT_SOURCE_DIR}/src/protocol.c
+	${PROJECT_SOURCE_DIR}/src/queue.c
 )
 
 add_subdirectory(src)

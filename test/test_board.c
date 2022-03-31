@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "task.h"
-
 #include "board.h"
+#include "task.h"
 
 static void test_board_create(void) {
 	const size_t rows = 3;
@@ -15,7 +14,7 @@ static void test_board_create(void) {
 		assert(b->board[i] == BOARD_EMPTY_SPACE);
 	}
 
-	board_destroy(b);
+	board_free(b);
 }
 
 static void test_board_set(void) {
@@ -35,7 +34,7 @@ static void test_board_set(void) {
 	ASSERT(strcmp(actual, expect) == 0);
 
 	free(actual);
-	board_destroy(b);
+	board_free(b);
 }
 
 static void test_board_get(void) {
@@ -50,7 +49,7 @@ static void test_board_get(void) {
 	ASSERT(board_get(b, (BoardPos){ .row = 1, .col = 2 }) == 'X');
 	ASSERT(board_get(b, (BoardPos){ .row = 2, .col = 4 }) == 'O');
 
-	board_destroy(b);
+	board_free(b);
 }
 
 int main(void) {

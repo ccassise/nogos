@@ -10,7 +10,7 @@
  * corner is 0,0 (row, then column).
  * 
  */
-typedef struct {
+typedef struct Board {
 	size_t rows;
 	size_t cols;
 	char *board;
@@ -20,14 +20,14 @@ typedef struct {
  * @brief A position on the board.
  * 
  */
-typedef struct {
+typedef struct BoardPos {
 	size_t row;
 	size_t col;
 } BoardPos;
 
 /**
  * @brief Create a board object. 
- * The user must call board_destroy on the returned Board when done.
+ * The user must call board_free on the returned Board when done.
  * 
  * @param rows Number of rows the board will have.
  * @param cols Number of columns a board will have.
@@ -40,7 +40,7 @@ Board *board_create(size_t rows, size_t cols);
  * 
  * @param b The board to free.
  */
-void board_destroy(Board *b);
+void board_free(Board *b);
 
 /**
  * @brief Get the char at the given board position.

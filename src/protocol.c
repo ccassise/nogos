@@ -1,7 +1,10 @@
 #include <ctype.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "protocol.h"
+
+#define COMMAND_SIZE 16
 
 /**
  * @brief Match the next characters in the stream exactly to the provided string.
@@ -32,7 +35,7 @@ static bool match(FILE *stream, const char *str) {
 static int skipspace(FILE *stream) {
 	int c;
 	while ((c = getc(stream)) != EOF) {
-		if (!isspace(c)) {
+		if (!isspace(c) && c != '\0') {
 			break;
 		}
 	}
@@ -51,18 +54,21 @@ static int skipspace(FILE *stream) {
  * @param arg The buffer to write the argument to.
  * @param arg_size The size of the buffer.
  * @param ctype The function that is used to check if character is valid for the argument.
+ * @return int The last consumed character in stream.
  */
-static void parse_arg(FILE *stream, char *arg, int arg_size, int (ctype)(int)) {
+static int parse_arg(FILE *stream, char *arg, int arg_size, int (ctype)(int)) {
 	int ch;
-	int count = 0;
-	while ((ch = getc(stream)) != EOF && count < arg_size) {
+	int len = 0;
+	while ((ch = getc(stream)) != EOF && len < arg_size) {
 		if (!ctype(ch)) {
 			break;
 		}
 
-		arg[count++] = (char)ch;
-		arg[count] = '\0';
+		arg[len++] = (char)ch;
+		arg[len] = '\0';
 	}
+
+	return ch;
 }
 
 Protocol pro_parse(FILE *stream) {
@@ -78,22 +84,30 @@ Protocol pro_parse(FILE *stream) {
 	}
 
 	if (c == 'L') {
-		if (match(stream, "LEAVE")) {
+		char command[COMMAND_SIZE];
+		c = parse_arg(stream, command, COMMAND_SIZE - 1, isalpha);
+		if (strcmp(command, "LEAVE") == 0) {
 			result.type = PRO_LEAVE;
+		} else if (strcmp(command, "LOGOUT") == 0) {
+			result.type = PRO_LOGOUT;
+		} else if (strcmp(command, "LOGIN") == 0) {
+			c = skipspace(stream);
+			c = parse_arg(stream, result.arg1, PRO_ARG_SIZE - 1, isalnum);
+
+			if (result.arg1[0] != '\0') {
+				result.type = PRO_LOGIN;
+			}
 		}
 	}
 
 	if (c == 'M') {
 		if (match(stream, "MOVE")) {
 			c = skipspace(stream);
-
-			parse_arg(stream, result.arg1, PRO_ARG_SIZE - 1, isdigit);
-
+			c = parse_arg(stream, result.arg1, PRO_ARG_SIZE - 1, isdigit);
 			c = skipspace(stream);
+			c = parse_arg(stream, result.arg2, PRO_ARG_SIZE - 1, isdigit);
 
-			parse_arg(stream, result.arg2, PRO_ARG_SIZE - 1, isdigit);
-
-			if (c != EOF && result.arg1[0] != '\0' && result.arg2[0] != '\0') {
+			if (result.arg1[0] != '\0' && result.arg2[0] != '\0') {
 				result.type = PRO_MOVE;
 			}
 		}

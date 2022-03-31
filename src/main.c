@@ -12,12 +12,92 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "context.h"
 #include "lobby.h"
 #include "log.h"
-#include "message_queue.h"
+#include "message.h"
+#include "player.h"
 #include "protocol.h"
+#include "queue.h"
 
 #define BACKLOG 10
+
+#define RESPONSE_SIZE 512
+
+/**
+ * @brief Sends a message to all players in the current lobby.
+ * 
+ * @param l The lobby that the message will be sent to.
+ * @param str The string that will be sent. If str has a terminating null
+ * character it will be discarded.
+ * @param slen The length of the string that will be sent.
+ * @return -1 if the message failed to write. 0 otherwise.
+ */
+static int broadcast_all(Lobby *l, const char *str, size_t slen) {
+	int result = 0;
+
+	for (int i = 0; i < l->players_len; i++) {
+		long wrote = l->players[i].write(&l->players[i], str, slen);
+		if (wrote <= 0) {
+			result = -1;
+		}
+	}
+
+	return result;
+}
+
+/**
+ * @brief Sends a message to all players in the current lobby except for the
+ * given player.
+ * 
+ * @param l The lobby that the message will be sent to.
+ * @param str The string that will be sent. If str has a terminating null
+ * character it will be discarded.
+ * @param slen The length of the string that will be sent.
+ * @param playerfd The file descriptor of the player.
+ * @return -1 if the message failed to write. 0 otherwise.
+ */
+static int broadcast_from(Lobby *l, const char *str, size_t slen, int playerfd) {
+	int result = 0;
+
+	for (int i = 0; i < l->players_len; i++) {
+		if (l->players[i].fd != playerfd) {
+			long wrote = l->players[i].write(&l->players[i], str, slen);
+			if (wrote <= 0) {
+				result = -1;
+			}
+		}
+	}
+
+	return result;
+}
+
+static long write_ok(const Player *player) {
+	return player->write(player, "OK\r\n", 4);
+}
+
+/**
+ * @brief Writes error and given message to player. The message should be terminated with CRLF.
+ * 
+ * @param player The player to write to.
+ * @param msg The CRLF terminated message to include with the error. Should be NULL if no message is being sent.
+ * @return long How many bytes were written. -1 on errors.
+ */
+static long write_error(const Player *player, const void *msg) {
+	if (msg == NULL) {
+		return player->write(player, "ERROR\r\n", 7);
+	}
+
+	#define ERROR_MSG_SIZE 128
+	#define ERROR_LEN 5
+
+	char error_msg[ERROR_MSG_SIZE] = "ERROR";
+	strncat(error_msg + ERROR_LEN, msg, ERROR_MSG_SIZE - ERROR_LEN);
+
+	#undef ERROR_MSG_SIZE
+	#undef ERROR_LEN
+	return player->write(player, error_msg, strlen(error_msg));
+}
 
 static void *get_in_addr(struct sockaddr* sa) {
 	if (sa->sa_family == AF_INET) {
@@ -27,43 +107,106 @@ static void *get_in_addr(struct sockaddr* sa) {
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-static void add_to_pfds(struct pollfd *pfds[], int newfd, size_t *fd_count, size_t *fd_size) {
-	if (*fd_count == *fd_size) {
-		*fd_size *= 2;
+static int serve_pro_join(Context *ctx, Protocol *pro, Player *player) {
+	(void)pro;
 
-		pfds = realloc(*pfds, sizeof(**pfds) * (*fd_size));
+	int result = lobby_join(ctx->l, player);
+
+	char buf[RESPONSE_SIZE];
+	int buf_size = snprintf(buf, RESPONSE_SIZE, "GOTJOIN %s\r\n", player->name);
+	if (buf_size <= 0) {
+		LOG_ERROR("failed to create gotjoin message\n");
+		return -1;
 	}
 
-	(*pfds)[*fd_count].fd = newfd;
-	(*pfds)[*fd_count].events = POLLIN;
-	(*pfds)[*fd_count].revents = 0;
+	if (broadcast_from(ctx->l, buf, (size_t)buf_size, player->fd) < 0) {
+		LOG_ERROR("failed to broadcast gotjoin from player\n");
+		return -1;
+	}
 
-	(*fd_count)++;
+	return result;
 }
 
-static void del_from_pfds(struct pollfd pfds[], size_t i, size_t *fd_count) {
-	pfds[i] = pfds[*fd_count - 1];
+static int serve_pro_move(Context *ctx, Protocol *pro, Player *player) {
+	write_ok(player);
 
-	(*fd_count)--;
+	if (lobby_play_move(ctx->l, player, pro->arg1, pro->arg2) < 0) {
+		return -1;
+	}
+
+	LOG_DEBUG("[%s<%d>] played move %s %s\n", player->name, player->fd, pro->arg1, pro->arg2);
+
+	char buf[RESPONSE_SIZE];
+	int buf_size = snprintf(buf, RESPONSE_SIZE, "GOTMOVE %s %s\r\n", pro->arg1, pro->arg2);
+	if (buf_size <= 0) {
+		LOG_ERROR("failed to create gotmove message\n");
+		return -1;
+	}
+
+	if (broadcast_from(ctx->l, buf, (size_t)buf_size, player->fd) < 0) {
+		LOG_ERROR("failed to broadcast gotmove from player\n");
+		return -1;
+	}
+
+	int team;
+	if ((team = lobby_winner(ctx->l)) != -1) {
+		buf_size = snprintf(buf, RESPONSE_SIZE, "GOTWINNER %c\r\n", team);
+		if (buf_size <= 0) {
+			LOG_ERROR("failed to create gotwinner message\n");
+			return -1;
+		}
+
+		if (broadcast_all(ctx->l, buf, (size_t)buf_size) < 0) {
+			LOG_ERROR("failed to broadcast gotwinner to all\n");
+			return -1;
+		}
+	}
+
+	return 0;
 }
 
-typedef struct {
-	Lobby *l;
-	MessageQueue *msgq;
-} Context;
+static void serve(Context *ctx, Protocol *pro, Player *player) {
+	if (!player->is_login && pro->type != PRO_LOGIN && pro->type != PRO_LOGOUT) {
+		pro->type = PRO_ERROR;
+	}
 
-static void serve(Context *ctx, Protocol *pro, int fd) {
 	int status;
 	switch (pro->type) {
 	case PRO_JOIN:
-		status = lobby_join(ctx->l, fd);
+		LOG_DEBUG("[%s<%d>] joined a lobby\n", player->name, player->fd);
+
+		status = serve_pro_join(ctx, pro, player);
 		break;
 	case PRO_LEAVE:
+		LOG_DEBUG("[%s<%d>] left a lobby\n", player->name, player->fd);
+
+		lobby_leave(ctx->l, player);
+
+		const char left[] = "GOTLEAVE\r\n";
+		broadcast_from(ctx->l, left, (sizeof left / sizeof left[0]) - 1, player->fd);
+
 		status = 0;
-		lobby_leave(ctx->l, fd);
+		break;
+	case PRO_LOGIN:
+		player->name[0] = '\0';
+		player->is_login = true;
+		strncat(player->name, pro->arg1, PLAYER_NAME_SIZE);
+
+		LOG_DEBUG("[%s<%d>] login\n", player->name, player->fd);
+
+		status = 0;
+		break;
+	case PRO_LOGOUT:
+		LOG_DEBUG("[%s<%d>] logout\n", player->name, player->fd);
+
+		player->is_login = false;
+		queue_put(ctx->closeq, &player->fd);
+		lobby_leave(ctx->l, player);
+		ctx_remove_player(ctx, player->fd);
+		status = 0;
 		break;
 	case PRO_MOVE:
-		status = lobby_play_move(ctx->l, fd, pro->arg1, pro->arg2);
+		status = serve_pro_move(ctx, pro, player);
 		break;
 	case PRO_ERROR:
 	default:
@@ -71,9 +214,9 @@ static void serve(Context *ctx, Protocol *pro, int fd) {
 	}
 
 	if (status == -1) {
-		msgq_put(ctx->msgq, &(Message){ .to = { fd }, .to_count = 1, .data = "ERROR\r\n", .data_count = 7 });
-	} else {
-		msgq_put(ctx->msgq, &(Message){ .to = { fd }, .to_count = 1, .data = "OK\r\n", .data_count = 4 });
+		write_error(player, NULL);
+	} else if (pro->type != PRO_MOVE) {
+		write_ok(player);
 	}
 }
 
@@ -92,7 +235,7 @@ int main(int argc, char **argv) {
 	struct addrinfo *servinfo;
 	if ((status = getaddrinfo(NULL, argv[1], &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-		exit(1);
+		exit(71);
 	}
 
 	int listener;
@@ -105,7 +248,7 @@ int main(int argc, char **argv) {
 		int yes = 1;
 		if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes)) {
 			perror("setsockopt");
-			exit(1);
+			exit(71);
 		}
 
 		if (bind(listener, p->ai_addr, p->ai_addrlen) == -1) {
@@ -121,38 +264,43 @@ int main(int argc, char **argv) {
 
 	if (listen(listener, BACKLOG) == -1) {
 		perror("server: listen");
-		exit(1);
+		exit(71);
 	}
 
 	printf("Listening on %s\n", argv[1]);
 
+	Queue *msgq = queue_create(sizeof(Message));
+	Queue *closeq = queue_create(sizeof(int));
+	Context *ctx = ctx_create();
+	if (ctx) {
+		ctx->msgq = msgq;
+		ctx->closeq = closeq;
+		ctx->l = lobby_create(9, 9);
+	}
 
-	size_t fd_count = 0;
-	size_t fd_size = 5;
-	struct pollfd *pfds = malloc(sizeof *pfds * fd_size);
+	if (!msgq || !closeq || !ctx || !ctx->l) {
+		fprintf(stderr, "failed to instantiate structs\n");
+		exit(71);
+	}
 
-	add_to_pfds(&pfds, listener, &fd_count, &fd_size);
-
-	MessageQueue *msgq = msgq_create();
-	Context ctx = { .l = lobby_create(msgq, 9, 9), .msgq = msgq };
-	if (!msgq) {
-		fprintf(stderr, "failed to allocate memory for MessageQueue\n");
-		exit(1);
+	if (ctx_add_player(ctx, &(Player){ .fd = listener, .name = "HOST" }) < 0) {
+		fprintf(stderr, "failed to add listener\n");
+		exit(70);
 	}
 
 	for (;;) {
 		int poll_checked = 0;  // Number of current poll events handled.
-		int poll_count = poll(pfds, fd_count, -1);
-		if (poll_count == -1) {
+		int poll_len = poll(ctx->pfds, ctx->pfds_len, -1);
+		if (poll_len == -1) {
 			perror("poll");
 			break;
 		}
 
-		for (size_t i = 0; i < fd_count && poll_checked < poll_count; i++) {
-			if (pfds[i].revents & POLLIN) {
+		for (size_t i = 0; i < ctx->pfds_len && poll_checked < poll_len; i++) {
+			if (ctx->pfds[i].revents & POLLIN) {
 				poll_checked++;
 
-				if (pfds[i].fd == listener) {
+				if (ctx->pfds[i].fd == listener) {
 					struct sockaddr_storage remoteaddr;
 					socklen_t addrlen = sizeof remoteaddr;
 
@@ -161,60 +309,83 @@ int main(int argc, char **argv) {
 					if (newfd == -1) {
 						perror("accept");
 					} else {
-						add_to_pfds(&pfds, newfd, &fd_count, &fd_size);
+						Player new_player;
+						memset(&new_player, 0, sizeof new_player);
+
+	  					new_player.msgq = ctx->msgq;
+						new_player.fd = newfd;
+						new_player.write = player_write;
+						new_player.read = player_read;
+
+						ctx_add_player(ctx, &new_player);
+
+						write_ok(&new_player);
 
 						char remote_ip[INET6_ADDRSTRLEN];
-						printf("new connection: %s %d on socket: %d\n",
+						LOG_DEBUG("new connection: %s %d on socket: %d\n",
 							inet_ntop(remoteaddr.ss_family, get_in_addr((struct sockaddr*)&remoteaddr),
 							remote_ip,
 							INET6_ADDRSTRLEN),
 							newfd,
 							newfd);
-
-	  					msgq_put(msgq, &(Message){ .to = { newfd }, .to_count = 1, .data = "OK\r\n", .data_count = 4 });
 					}
 				} else {
-					int sender_fd = pfds[i].fd;
+					int sender_fd = ctx->pfds[i].fd;
+					Player *player = ctx_get_player(ctx, sender_fd);
+					if (!player) {
+						LOG_ERROR("unable to get player: %d\n", sender_fd);
+						continue;
+					}
 
-					char buf[MSG_MAX_SIZE];
-					int buf_count = (int)recv(sender_fd, buf, MSG_MAX_SIZE - 1, 0);
+					char buf[MSG_MAX_SIZE + 1];
+					long buf_len = player->read(player, buf, MSG_MAX_SIZE);
+					buf[buf_len] = '\0';
 					
-					if (buf_count <= 0) {
-						if (buf_count == 0) {
-							printf("socket closed: %d\n", pfds[i].fd);
+					if (buf_len <= 0) {
+						if (buf_len == 0) {
+							printf("socket closed: %d\n", sender_fd);
 						} else {
 							perror("recv");
 						}
 
-						lobby_leave(ctx.l, pfds[i].fd);
-
-						close(pfds[i].fd);
-						del_from_pfds(pfds, i, &fd_count);
+						lobby_leave(ctx->l, ctx_get_player(ctx, sender_fd));
+						ctx_remove_player(ctx, sender_fd);
+						close(sender_fd);
 					} else {
-						Protocol pro = pro_parse(fmemopen(buf, (size_t)buf_count, "r"));
-						DEBUGF("[%d] parse: %d '%s' '%s'\n", sender_fd, pro.type, pro.arg1, pro.arg2);
-						serve(&ctx, &pro, sender_fd);
+						Protocol pro = pro_parse(fmemopen(buf, (size_t)buf_len, "r"));
+						LOG_DEBUG("[%d] parse: %d '%s' '%s'\n", sender_fd, pro.type, pro.arg1, pro.arg2);
+						serve(ctx, &pro, player);
 					}
 				}
 			}
 		}
 
 		// Send all messages in queue.
-		while (!msgq_empty(msgq)) {
-			Message tmp = msgq_get(msgq);
+		while (!queue_isempty(ctx->msgq)) {
+			Message msg = *(Message*)queue_get(ctx->msgq);
 
-			for (int k = 0; k < tmp.to_count; k++) {
-				if (send(tmp.to[k], &tmp.data, (size_t)tmp.data_count, 0) == -1) {
+			for (int i = 0; i < msg.to_len; i++) {
+				if (send(msg.to[i], &msg.data, (size_t)msg.data_len, 0) == -1) {
 					perror("send");
 				}
 			}
+		}
+
+		// Close all file descriptors in queue.
+		while (!queue_isempty(ctx->closeq)) {
+			int fd = *(int*)queue_get(ctx->closeq);
+
+			LOG_DEBUG("closing [%d]\n", fd);
+			close(fd);
 		}
 	}
 
 	printf("Connection closed\n");
 
-	free(pfds);
-	msgq_destroy(msgq);
+	queue_free(msgq);
+	queue_free(closeq);
+	lobby_free(ctx->l);
+	ctx_destory(ctx);
 
 	return 0;
 }

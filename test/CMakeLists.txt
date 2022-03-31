@@ -1,8 +1,9 @@
 list(APPEND tests
 	board
+	context
 	lobby
-	message_queue
 	protocol
+	queue
 )
 
 foreach(test IN LISTS tests)
@@ -12,20 +13,12 @@ foreach(test IN LISTS tests)
 
 	target_include_directories(test_${test} PRIVATE ${PROJECT_SOURCE_DIR}/src)
 
-	# For some reason protocol tests fail when compiled with -fsanitize=address,
-	# but valgrind isn't reporting anything and the tests are passing. Seems to
-	# be a weird interaction with fmemopen when being called with a NULL pointer
-	# as the first argument?
-	if(test STREQUAL "protocol")
-		target_compile_options(test_${test} PRIVATE ${wflags})
-	else()
-		target_compile_options(test_${test} PRIVATE ${wflags} ${sanitizers})
-		# GCC
-		# target_link_options(test_${test} PRIVATE ${sanitizers} -static-libasan)
-		# Clang
-		target_link_options(test_${test} PRIVATE ${sanitizers} -static-libsan)
-	endif()
+	target_compile_options(test_${test} PRIVATE ${wflags} ${sanitizers})
 
+	# GCC
+	target_link_options(test_${test} PRIVATE ${sanitizers} -static-libasan)
+	# Clang
+	# target_link_options(test_${test} PRIVATE ${sanitizers} -static-libsan)
 
 	add_test(NAME test_${test} COMMAND test_${test})
 endforeach()
