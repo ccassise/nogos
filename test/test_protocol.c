@@ -235,7 +235,6 @@ static void test_pro_arg_limit_test(void) {
 
 	Protocol actual = pro_parse(stream);
 
-	fprintf(stderr, "%ld\n", strlen(actual.arg1));
 	ASSERT(actual.type == PRO_LOGIN);
 	ASSERT(strlen(actual.arg1) == PRO_ARG_SIZE - 1);
 
