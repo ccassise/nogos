@@ -4,15 +4,6 @@
 #include "protocol.h"
 #include "task.h"
 
-static FILE *stream_setup(const char *input) {
-	FILE *stream = fmemopen(NULL, strlen(input) + 1, "r+");
-
-	fwrite(input, sizeof *input, strlen(input), stream);
-	rewind(stream);
-
-	return stream;
-}
-
 static void test_pro_parse_fail(void) {
 	const char *inputs[] = {
 		"     ",
@@ -24,13 +15,9 @@ static void test_pro_parse_fail(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_ERROR);
-
-		fclose(stream);
 	}
 
 }
@@ -46,13 +33,9 @@ static void test_pro_parse_join(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_JOIN);
-
-		fclose(stream);
 	}
 }
 
@@ -66,13 +49,9 @@ static void test_pro_parse_join_fail(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_ERROR);
-
-		fclose(stream);
 	}
 }
 
@@ -87,13 +66,9 @@ static void test_pro_parse_leave(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_LEAVE);
-
-		fclose(stream);
 	}
 }
 
@@ -107,13 +82,9 @@ static void test_pro_parse_leave_fail(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_ERROR);
-
-		fclose(stream);
 	}
 }
 
@@ -135,15 +106,11 @@ static void test_pro_parse_move(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_MOVE);
 		ASSERT(strcmp(expect[i][0], actual.arg1) == 0);
 		ASSERT(strcmp(expect[i][1], actual.arg2) == 0);
-
-		fclose(stream);
 	}
 }
 
@@ -158,13 +125,9 @@ static void test_pro_parse_move_fail(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_ERROR);
-
-		fclose(stream);
 	}
 }
 
@@ -186,14 +149,10 @@ static void test_pro_parse_login(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_LOGIN);
 		ASSERT(strcmp(expect[i], actual.arg1) == 0);
-
-		fclose(stream);
 	}
 }
 
@@ -207,13 +166,9 @@ static void test_pro_parse_login_fail(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_ERROR);
-
-		fclose(stream);
 	}
 }
 
@@ -231,15 +186,11 @@ static void test_pro_arg_limit_test(void) {
 	strncat(input, "LOGIN ", 256);
 	strncat(input, arg, 256);
 	
-	FILE *stream = stream_setup(input);
+	Protocol actual = pro_parse(input, strlen(input));
 
-	Protocol actual = pro_parse(stream);
-
-	fprintf(stderr, "%ld\n", strlen(actual.arg1));
 	ASSERT(actual.type == PRO_LOGIN);
 	ASSERT(strlen(actual.arg1) == PRO_ARG_SIZE - 1);
 
-	fclose(stream);
 	free(arg);
 }
 
@@ -254,13 +205,9 @@ static void test_pro_parse_logout(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_LOGOUT);
-
-		fclose(stream);
 	}
 }
 
@@ -276,13 +223,9 @@ static void test_pro_parse_logout_fail(void) {
 	const size_t inputs_len = sizeof inputs / sizeof *inputs;
 
 	for (size_t i = 0; i < inputs_len; i++) {
-		FILE *stream = stream_setup(inputs[i]);
-
-		Protocol actual = pro_parse(stream);
+		Protocol actual = pro_parse(inputs[i], strlen(inputs[i]));
 
 		ASSERT(actual.type == PRO_ERROR);
-
-		fclose(stream);
 	}
 }
 
