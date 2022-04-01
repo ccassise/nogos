@@ -1,10 +1,6 @@
 #ifndef PROTOCOL_H_
 #define PROTOCOL_H_
 
-#include <stdio.h>
-
-#include "board.h"
-
 #define PRO_ARG_SIZE 32
 
 typedef enum {
@@ -24,11 +20,14 @@ typedef struct Protocol {
 } Protocol;
 
 /**
- * @brief Parses the given buffer and returns its representation.
+ * @brief Parses the given buffer and returns the parsed command and arguments
+ * if any.
  * 
- * @param stream* The stream to read from.
+ * @param buf The buffer to parse.
+ * @param buf_len The amount of bytes in the buffer.
  * @return Protocol
  */
-Protocol pro_parse(FILE *stream);
+
+Protocol pro_parse(const char *buf, size_t buf_len);
 
 #endif

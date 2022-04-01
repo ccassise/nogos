@@ -99,18 +99,21 @@ static long write_error(const Player *player, const void *msg) {
 	return player->write(player, error_msg, strlen(error_msg));
 }
 
-static void *get_in_addr(struct sockaddr* sa) {
-	if (sa->sa_family == AF_INET) {
-		return &(((struct sockaddr_in*)sa)->sin_addr);
+static void *get_in_addr(struct sockaddr_storage* ss) {
+	if (ss->ss_family == AF_INET) {
+		return &(((struct sockaddr_in*)ss)->sin_addr);
 	}
 
-	return &(((struct sockaddr_in6*)sa)->sin6_addr);
+	return &(((struct sockaddr_in6*)ss)->sin6_addr);
 }
 
 static int serve_pro_join(Context *ctx, Protocol *pro, Player *player) {
 	(void)pro;
 
-	int result = lobby_join(ctx->l, player);
+	int result;
+	if ((result = lobby_join(ctx->l, player)) < 0 ) {
+		return result;
+	}
 
 	char buf[RESPONSE_SIZE];
 	int buf_size = snprintf(buf, RESPONSE_SIZE, "GOTJOIN %s\r\n", player->name);
@@ -128,13 +131,13 @@ static int serve_pro_join(Context *ctx, Protocol *pro, Player *player) {
 }
 
 static int serve_pro_move(Context *ctx, Protocol *pro, Player *player) {
-	write_ok(player);
-
 	if (lobby_play_move(ctx->l, player, pro->arg1, pro->arg2) < 0) {
 		return -1;
 	}
 
 	LOG_DEBUG("[%s<%d>] played move %s %s\n", player->name, player->fd, pro->arg1, pro->arg2);
+
+	write_ok(player);
 
 	char buf[RESPONSE_SIZE];
 	int buf_size = snprintf(buf, RESPONSE_SIZE, "GOTMOVE %s %s\r\n", pro->arg1, pro->arg2);
@@ -188,9 +191,9 @@ static void serve(Context *ctx, Protocol *pro, Player *player) {
 		status = 0;
 		break;
 	case PRO_LOGIN:
-		player->name[0] = '\0';
+		memset(player->name, '\0', PLAYER_NAME_SIZE);
+		memcpy(player->name, pro->arg1, PLAYER_NAME_SIZE - 1);
 		player->is_login = true;
-		strncat(player->name, pro->arg1, PLAYER_NAME_SIZE);
 
 		LOG_DEBUG("[%s<%d>] login\n", player->name, player->fd);
 
@@ -238,7 +241,7 @@ int main(int argc, char **argv) {
 		exit(71);
 	}
 
-	int listener;
+	int listener = -1;
 	for (struct addrinfo *p = servinfo; p != NULL; p = p->ai_next) {
 		if ((listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
 			perror("server: socket");
@@ -323,7 +326,7 @@ int main(int argc, char **argv) {
 
 						char remote_ip[INET6_ADDRSTRLEN];
 						LOG_DEBUG("new connection: %s %d on socket: %d\n",
-							inet_ntop(remoteaddr.ss_family, get_in_addr((struct sockaddr*)&remoteaddr),
+							inet_ntop(remoteaddr.ss_family, get_in_addr(&remoteaddr),
 							remote_ip,
 							INET6_ADDRSTRLEN),
 							newfd,
@@ -352,7 +355,7 @@ int main(int argc, char **argv) {
 						ctx_remove_player(ctx, sender_fd);
 						close(sender_fd);
 					} else {
-						Protocol pro = pro_parse(fmemopen(buf, (size_t)buf_len, "r"));
+						Protocol pro = pro_parse(buf, (size_t)buf_len);
 						LOG_DEBUG("[%d] parse: %d '%s' '%s'\n", sender_fd, pro.type, pro.arg1, pro.arg2);
 						serve(ctx, &pro, player);
 					}
