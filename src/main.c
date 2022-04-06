@@ -12,12 +12,13 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "libnogo/nogo.h"
+
 #include "context.h"
 #include "lobby.h"
 #include "log.h"
 #include "message.h"
 #include "player.h"
-#include "protocol.h"
 #include "queue.h"
 
 #define BACKLOG 10
@@ -107,7 +108,7 @@ static void *get_in_addr(struct sockaddr_storage* ss) {
 	return &(((struct sockaddr_in6*)ss)->sin6_addr);
 }
 
-static int serve_pro_join(Context *ctx, Protocol *pro, Player *player) {
+static int serve_pro_join(Context *ctx, NogoProtocol *pro, Player *player) {
 	(void)pro;
 
 	int result;
@@ -130,7 +131,7 @@ static int serve_pro_join(Context *ctx, Protocol *pro, Player *player) {
 	return result;
 }
 
-static int serve_pro_move(Context *ctx, Protocol *pro, Player *player) {
+static int serve_pro_move(Context *ctx, NogoProtocol *pro, Player *player) {
 	if (lobby_play_move(ctx->l, player, pro->arg1, pro->arg2) < 0) {
 		return -1;
 	}
@@ -168,19 +169,19 @@ static int serve_pro_move(Context *ctx, Protocol *pro, Player *player) {
 	return 0;
 }
 
-static void serve(Context *ctx, Protocol *pro, Player *player) {
-	if (!player->is_login && pro->type != PRO_LOGIN && pro->type != PRO_LOGOUT) {
-		pro->type = PRO_ERROR;
+static void serve(Context *ctx, NogoProtocol *pro, Player *player) {
+	if (!player->is_login && pro->type != NOGO_PRO_LOGIN && pro->type != NOGO_PRO_LOGOUT) {
+		pro->type = NOGO_PRO_ERROR;
 	}
 
 	int status;
 	switch (pro->type) {
-	case PRO_JOIN:
+	case NOGO_PRO_JOIN:
 		LOG_DEBUG("[%s<%d>] joined a lobby\n", player->name, player->fd);
 
 		status = serve_pro_join(ctx, pro, player);
 		break;
-	case PRO_LEAVE:
+	case NOGO_PRO_LEAVE:
 		LOG_DEBUG("[%s<%d>] left a lobby\n", player->name, player->fd);
 
 		lobby_leave(ctx->l, player);
@@ -190,7 +191,7 @@ static void serve(Context *ctx, Protocol *pro, Player *player) {
 
 		status = 0;
 		break;
-	case PRO_LOGIN:
+	case NOGO_PRO_LOGIN:
 		memset(player->name, '\0', PLAYER_NAME_SIZE);
 		memcpy(player->name, pro->arg1, PLAYER_NAME_SIZE - 1);
 		player->is_login = true;
@@ -199,7 +200,7 @@ static void serve(Context *ctx, Protocol *pro, Player *player) {
 
 		status = 0;
 		break;
-	case PRO_LOGOUT:
+	case NOGO_PRO_LOGOUT:
 		LOG_DEBUG("[%s<%d>] logout\n", player->name, player->fd);
 
 		player->is_login = false;
@@ -208,17 +209,17 @@ static void serve(Context *ctx, Protocol *pro, Player *player) {
 		ctx_remove_player(ctx, player->fd);
 		status = 0;
 		break;
-	case PRO_MOVE:
+	case NOGO_PRO_MOVE:
 		status = serve_pro_move(ctx, pro, player);
 		break;
-	case PRO_ERROR:
+	case NOGO_PRO_ERROR:
 	default:
 		status = -1;
 	}
 
 	if (status == -1) {
 		write_error(player, NULL);
-	} else if (pro->type != PRO_MOVE) {
+	} else if (pro->type != NOGO_PRO_MOVE) {
 		write_ok(player);
 	}
 }
@@ -355,7 +356,7 @@ int main(int argc, char **argv) {
 						ctx_remove_player(ctx, sender_fd);
 						close(sender_fd);
 					} else {
-						Protocol pro = pro_parse(buf, (size_t)buf_len);
+						NogoProtocol pro = nogo_parse(buf, (size_t)buf_len);
 						LOG_DEBUG("[%d] parse: %d '%s' '%s'\n", sender_fd, pro.type, pro.arg1, pro.arg2);
 						serve(ctx, &pro, player);
 					}
