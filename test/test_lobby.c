@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "board.h"
+#include "libnogo/nogo.h"
+
 #include "lobby.h"
 #include "task.h"
 
@@ -129,7 +130,7 @@ static void test_lobby_play_move(void) {
 		". . . . .\n"
 		"X . . . ."
 	);
-	char *actual = board_str(t.l->board);
+	char *actual = nogo_board_str(t.l->board);
 
 	ASSERT(strcmp(expect, actual) == 0);
 

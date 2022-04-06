@@ -53,13 +53,14 @@ if (${ENABLE_SANITIZERS})
 endif()
 
 list(APPEND SRC_FILES
-	${PROJECT_SOURCE_DIR}/src/board.c
 	${PROJECT_SOURCE_DIR}/src/context.c
 	${PROJECT_SOURCE_DIR}/src/lobby.c
 	${PROJECT_SOURCE_DIR}/src/player.c
-	${PROJECT_SOURCE_DIR}/src/protocol.c
 	${PROJECT_SOURCE_DIR}/src/queue.c
 )
+
+set(LIBNOGO_ENABLE_TESTS OFF)
+add_subdirectory(lib/libnogo)
 
 add_subdirectory(src)
 add_subdirectory(test)

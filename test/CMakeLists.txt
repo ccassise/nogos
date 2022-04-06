@@ -1,8 +1,6 @@
 list(APPEND tests
-	board
 	context
 	lobby
-	protocol
 	queue
 )
 
@@ -11,11 +9,10 @@ foreach(test IN LISTS tests)
 
 	set_property(TARGET test_${test} PROPERTY C_STANDARD ${C_STD})
 
-	target_include_directories(test_${test} PRIVATE ${PROJECT_SOURCE_DIR}/src)
-
 	target_compile_options(test_${test} PRIVATE ${WFLAGS} ${SANITIZERS})
-
-	target_link_options(test_${test} PRIVATE ${SANITIZERS} ${LIBSANITIZER})
+	target_include_directories(test_${test} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+	target_link_libraries(test_${test} PRIVATE libnogo)
+	target_link_options(test_${test} PRIVATE ${SANITIZERS} ${SANITIZER_LIB})
 
 	add_test(NAME test_${test} COMMAND test_${test})
 endforeach()

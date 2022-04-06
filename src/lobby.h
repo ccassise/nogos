@@ -16,7 +16,7 @@ typedef struct Lobby {
 	Player players[LOBBY_MAX_PLAYERS]; // List of all players.
 	int players_len; // Current number of players in the lobby.
 
-	struct Board *board; // The board that the game will be played on.
+	struct NogoBoard *board; // The board that the game will be played on.
 
 	struct State *state; // Keeps track of the game state.
 } Lobby;

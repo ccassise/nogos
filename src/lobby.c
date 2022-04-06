@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "board.h"
+#include "libnogo/nogo.h"
+
 #include "errno.h"
 #include "lobby.h"
 #include "log.h"
@@ -18,7 +19,7 @@ typedef struct State {
 	char turn; // The player who's turn it is.
 	char winner; // If game_over is set then this will be set to the winning team.
 	bool game_over; // Is the game over or not.
-	Board *visted; // Used to help determine a winner.
+	NogoBoard *visted; // Used to help determine a winner.
 } State;
 
 /**
@@ -32,20 +33,20 @@ typedef struct State {
  * @return true 
  * @return false 
  */
-static bool has_liberty(Board *b, Board *visited, char team, BoardPos pos) {
+static bool has_liberty(NogoBoard *b, NogoBoard *visited, char team, NogoBoardPos pos) {
 	bool result = false;
 
-	if (board_get(b, pos) == BOARD_EMPTY_SPACE) {
+	if (nogo_board_get(b, pos) == NOGO_BOARD_EMPTY_SPACE) {
 		return true;
 	}
 
-	if (board_get(b, pos) != team || board_get(visited, pos) == VISITED) {
+	if (nogo_board_get(b, pos) != team || nogo_board_get(visited, pos) == VISITED) {
 		return false;
 	}
 
-	board_set(visited, VISITED, pos);
+	nogo_board_set(visited, VISITED, pos);
 
-	const BoardPos adjacents[] = {
+	const NogoBoardPos adjacents[] = {
 		{ .row = pos.row - 1, .col = pos.col }, // up
 		{ .row = pos.row + 1, .col = pos.col }, // down
 		{ .row = pos.row, .col = pos.col - 1 }, // left
@@ -68,12 +69,12 @@ static bool has_liberty(Board *b, Board *visited, char team, BoardPos pos) {
  * @param visited The board used to keep track of what spaces were visited
  * when checking for a winner.
  */
-static void reset_visited(Board *visited) {
+static void reset_visited(NogoBoard *visited) {
 	// TODO: When the move history is implemented use that instead to reset all positions.
 	for (size_t col = 0; col < visited->cols; col++) {
 		for (size_t row = 0; row < visited->rows; row++) {
-			const BoardPos pos = (BoardPos){ .row = row, .col = col };
-			board_set(visited, !VISITED, pos);
+			const NogoBoardPos pos = (NogoBoardPos){ .row = row, .col = col };
+			nogo_board_set(visited, !VISITED, pos);
 		}
 	}
 }
@@ -90,12 +91,12 @@ static char find_loser(Lobby *l) {
 
 	for (size_t row = 0; row < l->board->rows && loser == '\0'; row++) {
 		for (size_t col = 0; col < l->board->cols && loser == '\0'; col++) {
-			const BoardPos pos = (BoardPos){ .row = row, .col = col };
+			const NogoBoardPos pos = (NogoBoardPos){ .row = row, .col = col };
 			char team;
-			if ((team = board_get(l->board, pos)) != BOARD_EMPTY_SPACE && board_get(l->state->visted, pos) != VISITED) {
+			if ((team = nogo_board_get(l->board, pos)) != NOGO_BOARD_EMPTY_SPACE && nogo_board_get(l->state->visted, pos) != VISITED) {
 				const bool game_over = !has_liberty(l->board, l->state->visted, team, pos);
 				if (game_over) {
-					loser = board_get(l->board, pos);
+					loser = nogo_board_get(l->board, pos);
 				}
 			}
 		}
@@ -141,18 +142,18 @@ static char next_team_turn(State *s) {
 Lobby *lobby_create(size_t rows, size_t cols) {
 	Lobby *l = calloc(1, sizeof *l);
 
-	l->board = board_create(rows, cols);
+	l->board = nogo_board_create(rows, cols);
 	l->state = malloc(sizeof *l->state);
 	l->state->turn = 'O';
 	l->state->game_over = false;
-	l->state->visted = board_create(rows, cols);
+	l->state->visted = nogo_board_create(rows, cols);
 
 	return l;
 }
 
 void lobby_free(Lobby *l) {
-	board_free(l->board);
-	board_free(l->state->visted);
+	nogo_board_free(l->board);
+	nogo_board_free(l->state->visted);
 	free(l->state);
 	free(l);
 }
@@ -231,14 +232,14 @@ int lobby_play_move(Lobby *l, const Player *player, const char *row_str, const c
 		return -1;
 	}
 
-	const BoardPos pos = { .row = (size_t)row, .col = (size_t)col };
-	const bool is_free = board_get(l->board, pos) == BOARD_EMPTY_SPACE;
+	const NogoBoardPos pos = { .row = (size_t)row, .col = (size_t)col };
+	const bool is_free = nogo_board_get(l->board, pos) == NOGO_BOARD_EMPTY_SPACE;
 	if (!is_free) {
 		LOG_ERROR("space is occupied\n");
 		return -1;
 	}
 
-	board_set(l->board, found->team, pos);
+	nogo_board_set(l->board, found->team, pos);
 	l->state->turn = next_team_turn(l->state);
 
 	char loser;
