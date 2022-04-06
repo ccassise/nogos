@@ -4,7 +4,13 @@ project(nogos VERSION 0.1.0 LANGUAGES C)
 include(CTest)
 enable_testing()
 
-list(APPEND wflags
+option(ENABLE_SANITIZERS "Compile with or without sanitizers" OFF)
+
+set(C_STD 99)
+set(SANITIZERS)
+set(SANITIZER_LIB)
+
+list(APPEND WFLAGS
 	-Wall
 	-Wextra
 	-Wshadow
@@ -23,22 +29,30 @@ list(APPEND wflags
 	-Wswitch-default
 	-fstack-protector-strong
 	-Wparentheses
-	-Wformat-overflow
 	-Wunused-macros
 	-Wswitch-enum
 )
 
-list(APPEND sanitizers
-	-fsanitize=address
-	-fsanitize=undefined
-	-fno-sanitize-recover=all
-	-fsanitize=float-divide-by-zero
-	-fsanitize=float-cast-overflow
-	-fno-sanitize=null
-	-fno-sanitize=alignment
-)
+if (${ENABLE_SANITIZERS})
+	message(STATUS "Compiling with sanitizers")
+	list(APPEND SANITIZERS
+		-fsanitize=address
+		-fsanitize=undefined
+		-fno-sanitize-recover=all
+		-fsanitize=float-divide-by-zero
+		-fsanitize=float-cast-overflow
+		-fno-sanitize=null
+		-fno-sanitize=alignment
+	)
 
-list(APPEND srcfiles
+	if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+		set(SANITIZER_LIB -static-libsan)
+	else()
+		set(SANITIZER_LIB -static-libasan)
+	endif()
+endif()
+
+list(APPEND SRC_FILES
 	${PROJECT_SOURCE_DIR}/src/board.c
 	${PROJECT_SOURCE_DIR}/src/context.c
 	${PROJECT_SOURCE_DIR}/src/lobby.c
