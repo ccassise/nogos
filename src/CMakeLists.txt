@@ -1,16 +1,11 @@
 add_executable(
 	nogos
 	main.c
-	${srcfiles}
+	${SRC_FILES}
 )
 
-set_property(TARGET nogos PROPERTY C_STANDARD 99)
+set_property(TARGET nogos PROPERTY C_STANDARD ${C_STD})
 
-# target_compile_options(nogos PRIVATE ${wflags})
+target_compile_options(nogos PRIVATE ${WFLAGS} ${SANITIZERS})
 
-target_compile_options(nogos PRIVATE ${wflags} ${sanitizers})
-# GCC
-target_link_options(nogos PRIVATE ${sanitizers} -static-libasan)
-
-# Clang
-# target_link_options(nogos PRIVATE ${sanitizers} -static-libsan)
+target_link_options(nogos PRIVATE ${SANITIZERS} ${LIBSANITIZER})
