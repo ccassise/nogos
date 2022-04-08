@@ -343,7 +343,6 @@ int main(int argc, char **argv) {
 
 					char buf[MSG_MAX_SIZE + 1];
 					long buf_len = player->read(player, buf, MSG_MAX_SIZE);
-					buf[buf_len] = '\0';
 					
 					if (buf_len <= 0) {
 						if (buf_len == 0) {
@@ -356,6 +355,7 @@ int main(int argc, char **argv) {
 						ctx_remove_player(ctx, sender_fd);
 						close(sender_fd);
 					} else {
+						buf[buf_len] = '\0';
 						NogoProtocol pro = nogo_parse(buf, (size_t)buf_len);
 						LOG_DEBUG("[%d] parse: %d '%s' '%s'\n", sender_fd, pro.type, pro.arg1, pro.arg2);
 						serve(ctx, &pro, player);
